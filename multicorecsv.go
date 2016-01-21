@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"io"
+	"log"
 	"runtime"
 	"sync"
 )
@@ -16,6 +17,7 @@ type MulticoreReader struct {
 	lineout chan []string
 	errchan chan error
 	started sync.Once
+	count   int
 }
 
 func NewReader(r io.Reader) *MulticoreReader {
@@ -41,10 +43,19 @@ func (mcr *MulticoreReader) ReadAll() ([][]string, error) {
 	}
 }
 
+func (mcr *MulticoreReader) Stream() (chan []string, chan error) {
+	mcr.start()
+	return mcr.lineout, mcr.errchan
+}
+
 func (mcr *MulticoreReader) Read() ([]string, error) {
 	mcr.start()
 	line, ok := <-mcr.lineout
 	if ok {
+		mcr.count++
+		if mcr.count%100000 == 0 {
+			log.Printf("Read line %d", mcr.count)
+		}
 		return line, nil
 	}
 	return line, <-mcr.errchan
@@ -69,12 +80,11 @@ func (mcr *MulticoreReader) start() {
 		}()
 		for i := 0; i < runtime.NumCPU(); i++ {
 			go func() {
-				var buf bytes.Buffer
-				r := csv.NewReader(&buf)
+				r := csv.NewReader(bufio.NewReaderSize(BytesChanReader{
+					bytesChan: mcr.linein,
+				}, 1))
 				r.Comma = mcr.Comma
-				for b := range mcr.linein {
-					buf.Reset()
-					buf.Write(b)
+				for {
 					if line, err := r.Read(); err != nil {
 						err2 <- err
 						return
@@ -87,17 +97,12 @@ func (mcr *MulticoreReader) start() {
 		}
 		go func() {
 			defer close(mcr.lineout)
-			foundError := <-err1
+			foundError := <-err1 // in good case, this will still be io.EOF
 			for i := 0; i < runtime.NumCPU(); i++ {
 				err := <-err2
-				if err != io.EOF {
-					if foundError == nil {
-						foundError = err
-					}
+				if err != nil && foundError == io.EOF {
+					foundError = err
 				}
-			}
-			if foundError == nil {
-				foundError = io.EOF
 			}
 			go func() {
 				for {
@@ -106,4 +111,24 @@ func (mcr *MulticoreReader) start() {
 			}()
 		}()
 	})
+}
+
+type BytesChanReader struct {
+	bytesChan chan []byte
+	buf       bytes.Buffer
+}
+
+func (scr BytesChanReader) Read(dst []byte) (int, error) {
+	if scr.buf.Len() > 0 {
+		return scr.buf.Read(dst)
+	}
+	line, ok := <-scr.bytesChan
+	if !ok {
+		return 0, io.EOF
+	}
+	n := copy(dst, line)
+	if n < len(line) {
+		scr.buf.Write(line[n:])
+	}
+	return n, nil
 }
