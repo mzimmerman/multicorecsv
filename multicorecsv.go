@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/csv"
 	"io"
-	"log"
 	"runtime"
 	"sync"
 )
@@ -17,7 +16,6 @@ type MulticoreReader struct {
 	lineout chan []string
 	errchan chan error
 	started sync.Once
-	count   int
 }
 
 func NewReader(r io.Reader) *MulticoreReader {
@@ -52,10 +50,6 @@ func (mcr *MulticoreReader) Read() ([]string, error) {
 	mcr.start()
 	line, ok := <-mcr.lineout
 	if ok {
-		mcr.count++
-		if mcr.count%100000 == 0 {
-			log.Printf("Read line %d", mcr.count)
-		}
 		return line, nil
 	}
 	return line, <-mcr.errchan
