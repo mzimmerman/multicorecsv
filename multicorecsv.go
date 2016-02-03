@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"io"
 	"runtime"
+	"sync"
 )
 
 type linein struct {
@@ -34,6 +35,7 @@ type MulticoreReader struct {
 	queue            map[int][]string // used to buffer lines that come in out of order
 	finalError       error
 	cancel           chan struct{} // when this is closed, cancel all operations
+	once             sync.Once
 }
 
 func NewReader(r io.Reader) *MulticoreReader {
@@ -90,6 +92,7 @@ func (mcr *MulticoreReader) Read() ([]string, error) {
 	if mcr.finalError != nil {
 		return nil, mcr.finalError
 	}
+	mcr.start()
 	line, ok := mcr.queue[mcr.place]
 	if ok {
 		delete(mcr.queue, mcr.place)
@@ -194,12 +197,14 @@ func (mcr *MulticoreReader) waitForDone(err1, err2 chan error) {
 	//	log.Printf("mcr.waitForDone ending")
 }
 
-func (mcr *MulticoreReader) Start() {
-	err1 := make(chan error, 1)
-	err2 := make(chan error, runtime.NumCPU())
-	go mcr.startReading(err1)
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go mcr.parseCSVLines(err2)
-	}
-	go mcr.waitForDone(err1, err2)
+func (mcr *MulticoreReader) start() {
+	mcr.once.Do(func() {
+		err1 := make(chan error, 1)
+		err2 := make(chan error, runtime.NumCPU())
+		go mcr.startReading(err1)
+		for i := 0; i < runtime.NumCPU(); i++ {
+			go mcr.parseCSVLines(err2)
+		}
+		go mcr.waitForDone(err1, err2)
+	})
 }

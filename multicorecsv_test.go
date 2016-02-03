@@ -278,7 +278,6 @@ func TestRead(t *testing.T) {
 		if tt.Comma != 0 {
 			r.Comma = tt.Comma
 		}
-		r.Start()
 		out, err := r.ReadAll()
 		perr, _ := err.(*csv.ParseError)
 		if tt.Error != "" {
@@ -302,7 +301,6 @@ func TestCancel(t *testing.T) {
 	}
 	reader := NewReader(ir)
 	reader.Comma = '\t'
-	reader.Start()
 	defer reader.Close()
 	_, err := reader.Read()
 	if err != nil {
@@ -318,7 +316,6 @@ func BenchmarkRead(b *testing.B) {
 	reader.Comma = '\t'
 	b.ResetTimer()
 	b.StartTimer()
-	reader.Start()
 	for i := 0; i < b.N; i++ {
 		_, err := reader.Read()
 		if err != nil {
