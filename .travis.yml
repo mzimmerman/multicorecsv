@@ -1,0 +1,4 @@
+language: go
+script:
+- go test -bench . -race
+- go test -bench . -cpu 1,2,4,8,16
