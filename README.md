@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/mzimmerman/multicorecsv.svg)](https://travis-ci.org/mzimmerman/multicorecsv) [![Coverage](http://gocover.io/_badge/github.com/mzimmerman/multicorecsv)](http://gocover.io/github.com/mzimmerman/multicorecsv)
+
 # multicorecsv
 A multicore csv reader library in Go
 
