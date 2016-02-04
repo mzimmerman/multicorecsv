@@ -261,6 +261,41 @@ x,,,
 			{"c", "d", "e"},
 		},
 	},
+	{
+		Name: "Multicore error",
+		Input: `a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+a,b"b,c
+`,
+		Output: [][]string{},
+	},
 }
 
 func TestRead(t *testing.T) {

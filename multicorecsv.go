@@ -35,7 +35,8 @@ type MulticoreReader struct {
 	queue            map[int][]string // used to buffer lines that come in out of order
 	finalError       error
 	cancel           chan struct{} // when this is closed, cancel all operations
-	once             sync.Once
+	readOnce         sync.Once
+	closeOnce        sync.Once
 }
 
 // NewReader returns a new Reader that reads from r.
@@ -54,11 +55,14 @@ func NewReader(r io.Reader) *MulticoreReader {
 // Close will clean up any goroutines that aren't finished
 // It will also close the underlying Reader if it implements io.ReadCloser
 func (mcr *MulticoreReader) Close() error {
-	close(mcr.cancel)
-	if c, ok := mcr.reader.(io.ReadCloser); ok {
-		return c.Close()
-	}
-	return nil
+	var insideError error
+	mcr.closeOnce.Do(func() {
+		close(mcr.cancel)
+		if c, ok := mcr.reader.(io.ReadCloser); ok {
+			insideError = c.Close()
+		}
+	})
+	return insideError
 }
 
 // ReadAll reads all the remaining records from r.
@@ -180,6 +184,7 @@ func (mcr *MulticoreReader) parseCSVLines() error {
 		buf.Write(b.data)
 		char, _, err := buf.ReadRune()
 		if err != nil {
+			mcr.Close()
 			return err
 		}
 		if char == '\n' || char == mcr.Comment {
@@ -199,6 +204,7 @@ func (mcr *MulticoreReader) parseCSVLines() error {
 			if ok {
 				pe.Line = b.num + 1
 			}
+			mcr.Close()
 			return err
 		} else {
 			select {
@@ -230,7 +236,7 @@ func (mcr *MulticoreReader) waitForDone(err1, err2 chan error) {
 }
 
 func (mcr *MulticoreReader) start() {
-	mcr.once.Do(func() {
+	mcr.readOnce.Do(func() {
 		err1 := make(chan error, 1)
 		err2 := make(chan error)
 		go mcr.startReading(err1)
