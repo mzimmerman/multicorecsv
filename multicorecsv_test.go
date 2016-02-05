@@ -6,6 +6,7 @@ package multicorecsv
 
 import (
 	"encoding/csv"
+	"io"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -261,40 +262,18 @@ x,,,
 			{"c", "d", "e"},
 		},
 	},
+	// if there were more errors in the data, this could race as to which line
 	{
-		Name: "Multicore error",
-		Input: `a,b"b,c
+		Name:  "Multicore error",
+		Error: `bare " in non-quoted-field`, Line: 4, Column: 3,
+		Input: `a,bb,c
+a,bb,c
+a,bb,c
 a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
-a,b"b,c
+a,bb,c
+a,bb,c
+a,bb,c
 `,
-		Output: [][]string{},
 	},
 }
 
@@ -330,16 +309,22 @@ func TestRead(t *testing.T) {
 	}
 }
 
-func TestCancel(t *testing.T) {
+func TestClose(t *testing.T) {
 	ir := &infiniteReader{
 		data: data,
 	}
 	reader := NewReader(ir)
 	reader.Comma = '\t'
-	defer reader.Close()
-	_, err := reader.Read()
+	_, err := reader.Read() // start the process
 	if err != nil {
-		t.Errorf("could not read data: %s", err)
+		t.Errorf("Error reading from stream - %v", err)
+	}
+	reader.Close()
+	for {
+		_, err = reader.Read()
+		if err == io.EOF {
+			return
+		}
 	}
 }
 

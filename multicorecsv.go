@@ -58,7 +58,7 @@ func (mcr *MulticoreReader) Close() error {
 	var insideError error
 	mcr.closeOnce.Do(func() {
 		close(mcr.cancel)
-		if c, ok := mcr.reader.(io.ReadCloser); ok {
+		if c, ok := mcr.reader.(io.Closer); ok {
 			insideError = c.Close()
 		}
 	})
