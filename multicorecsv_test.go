@@ -328,12 +328,13 @@ func TestClose(t *testing.T) {
 	}
 }
 
-func BenchmarkRead(b *testing.B) {
+func benchmarkRead(b *testing.B, chunkSize int) {
 	ir := &infiniteReader{
 		data: data,
 	}
 	reader := NewReader(ir)
 	reader.Comma = '\t'
+	reader.ChunkSize = chunkSize
 	b.ResetTimer()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -344,6 +345,26 @@ func BenchmarkRead(b *testing.B) {
 	}
 	b.StopTimer()
 	reader.Close()
+}
+
+func BenchmarkRead1(b *testing.B) {
+	benchmarkRead(b, 1)
+}
+
+func BenchmarkRead10(b *testing.B) {
+	benchmarkRead(b, 10)
+}
+
+func BenchmarkRead50(b *testing.B) {
+	benchmarkRead(b, 50)
+}
+
+func BenchmarkRead100(b *testing.B) {
+	benchmarkRead(b, 100)
+}
+
+func BenchmarkRead1000(b *testing.B) {
+	benchmarkRead(b, 1000)
 }
 
 type infiniteReader struct {
