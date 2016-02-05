@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/mzimmerman/multicorecsv.svg)](https://travis-ci.org/mzimmerman/multicorecsv) [![Coverage](http://gocover.io/_badge/github.com/mzimmerman/multicorecsv)](http://gocover.io/github.com/mzimmerman/multicorecsv)
+[![Build Status](https://travis-ci.org/mzimmerman/multicorecsv.svg)](https://travis-ci.org/mzimmerman/multicorecsv) [![Coverage](http://gocover.io/_badge/github.com/mzimmerman/multicorecsv)](http://gocover.io/github.com/mzimmerman/multicorecsv)  [![GoReport](https://goreportcard.com/badge/mzimmerman/multicorecsv)](http://goreportcard.com/report/mzimmerman/multicorecsv)  [![GoDoc](https://godoc.org/github.com/mzimmerman/multicorecsv?status.svg)](https://godoc.org/github.com/mzimmerman/multicorecsv)  [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 # multicorecsv
 A multicore csv reader library in Go

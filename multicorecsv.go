@@ -19,7 +19,8 @@ type lineout struct {
 	num  int
 }
 
-type MulticoreReader struct {
+// Reader contains all the internals required.  Use NewReader(io.Reader).
+type Reader struct {
 	reader  io.Reader
 	linein  chan []linein
 	lineout chan []lineout
@@ -41,8 +42,8 @@ type MulticoreReader struct {
 }
 
 // NewReader returns a new Reader that reads from r.
-func NewReader(r io.Reader) *MulticoreReader {
-	return &MulticoreReader{
+func NewReader(r io.Reader) *Reader {
+	return &Reader{
 		reader:    r,
 		Comma:     ',',
 		linein:    make(chan []linein),
@@ -56,7 +57,7 @@ func NewReader(r io.Reader) *MulticoreReader {
 
 // Close will clean up any goroutines that aren't finished.
 // It will also close the underlying Reader if it implements io.ReadCloser
-func (mcr *MulticoreReader) Close() error {
+func (mcr *Reader) Close() error {
 	var insideError error
 	mcr.closeOnce.Do(func() {
 		close(mcr.cancel)
@@ -72,7 +73,7 @@ func (mcr *MulticoreReader) Close() error {
 // A successful call returns err == nil, not err == EOF. Because ReadAll is
 // defined to read until EOF, it does not treat end of file as an error to be
 // reported.
-func (mcr *MulticoreReader) ReadAll() ([][]string, error) {
+func (mcr *Reader) ReadAll() ([][]string, error) {
 	var all [][]string
 	out, errChan := mcr.Stream()
 	for line := range out {
@@ -85,7 +86,7 @@ func (mcr *MulticoreReader) ReadAll() ([][]string, error) {
 // Lines are sent on the channel in order they were in the source file.
 // The caller must receive all rows and receive the error from the error chan,
 // otherwise the caller must call Close to clean up any goroutines.
-func (mcr *MulticoreReader) Stream() (chan []string, chan error) {
+func (mcr *Reader) Stream() (chan []string, chan error) {
 	out := make(chan []string)
 	errChan := make(chan error, 1)
 	go func() {
@@ -112,7 +113,7 @@ func (mcr *MulticoreReader) Stream() (chan []string, chan error) {
 // Read reads one record from r.  The record is a slice of strings with each
 // string representing one field.  In the background, the internal io.Reader
 // will be read from ahead of the caller utilizing Read() to pull every row
-func (mcr *MulticoreReader) Read() ([]string, error) {
+func (mcr *Reader) Read() ([]string, error) {
 	if mcr.finalError != nil {
 		return nil, mcr.finalError
 	}
@@ -149,7 +150,7 @@ func (mcr *MulticoreReader) Read() ([]string, error) {
 	return nil, mcr.finalError
 }
 
-func (mcr *MulticoreReader) startReading() error {
+func (mcr *Reader) startReading() error {
 	defer close(mcr.linein)
 	linenum := 0
 	bytesreader := bufio.NewReader(mcr.reader)
@@ -184,7 +185,7 @@ NextChunk:
 	}
 }
 
-func (mcr *MulticoreReader) parseCSVLines() error {
+func (mcr *Reader) parseCSVLines() error {
 	var buf bytes.Buffer
 	r := csv.NewReader(&buf)
 	r.Comma = mcr.Comma
@@ -210,19 +211,19 @@ func (mcr *MulticoreReader) parseCSVLines() error {
 				continue
 			}
 			buf.UnreadRune()
-			if line, err := r.Read(); err != nil {
+			line, err := r.Read()
+			if err != nil {
 				pe, ok := err.(*csv.ParseError)
 				if ok {
 					pe.Line = b.num + 1
 				}
 				mcr.Close()
 				return err
-			} else {
-				parsed = append(parsed, lineout{
-					data: line,
-					num:  b.num,
-				})
 			}
+			parsed = append(parsed, lineout{
+				data: line,
+				num:  b.num,
+			})
 		}
 		select {
 		case mcr.lineout <- parsed:
@@ -233,7 +234,7 @@ func (mcr *MulticoreReader) parseCSVLines() error {
 	return nil
 }
 
-func (mcr *MulticoreReader) waitForDone(err1, err2 chan error) {
+func (mcr *Reader) waitForDone(err1, err2 chan error) {
 	foundError := <-err1
 	for i := 0; i < runtime.NumCPU(); i++ {
 		err := <-err2
@@ -248,7 +249,7 @@ func (mcr *MulticoreReader) waitForDone(err1, err2 chan error) {
 	mcr.errChan <- foundError
 }
 
-func (mcr *MulticoreReader) start() {
+func (mcr *Reader) start() {
 	mcr.readOnce.Do(func() {
 		err1 := make(chan error, 1)
 		err2 := make(chan error)
