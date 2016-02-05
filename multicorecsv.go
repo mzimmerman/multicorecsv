@@ -54,7 +54,7 @@ func NewReader(r io.Reader) *MulticoreReader {
 	}
 }
 
-// Close will clean up any goroutines that aren't finished
+// Close will clean up any goroutines that aren't finished.
 // It will also close the underlying Reader if it implements io.ReadCloser
 func (mcr *MulticoreReader) Close() error {
 	var insideError error
@@ -81,10 +81,10 @@ func (mcr *MulticoreReader) ReadAll() ([][]string, error) {
 	return all, <-errChan
 }
 
-// Stream returns a chan of []string representing a row in the CSV file
-// Lines are sent on the channel in order they were in the source file
+// Stream returns a chan of []string representing a row in the CSV file.
+// Lines are sent on the channel in order they were in the source file.
 // The caller must receive all rows and receive the error from the error chan,
-// otherwise the caller must call Close to clean up any goroutines
+// otherwise the caller must call Close to clean up any goroutines.
 func (mcr *MulticoreReader) Stream() (chan []string, chan error) {
 	out := make(chan []string)
 	errChan := make(chan error, 1)
