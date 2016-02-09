@@ -9,12 +9,12 @@ import (
 	"sync"
 )
 
-type linein struct {
+type csvLine struct {
 	data []byte
 	num  int
 }
 
-type lineout struct {
+type sliceLine struct {
 	data []string
 	num  int
 }
@@ -22,8 +22,8 @@ type lineout struct {
 // Reader contains all the internals required.  Use NewReader(io.Reader).
 type Reader struct {
 	reader  io.Reader
-	linein  chan []linein
-	lineout chan []lineout
+	linein  chan []csvLine
+	lineout chan []sliceLine
 	errChan chan error
 	// the following are from encoding/csv package and are copied into the underlying csv.Reader
 	Comma            rune
@@ -46,8 +46,8 @@ func NewReader(r io.Reader) *Reader {
 	return &Reader{
 		reader:    r,
 		Comma:     ',',
-		linein:    make(chan []linein),
-		lineout:   make(chan []lineout),
+		linein:    make(chan []csvLine),
+		lineout:   make(chan []sliceLine),
 		errChan:   make(chan error),
 		queue:     make(map[int][]string),
 		cancel:    make(chan struct{}),
@@ -156,11 +156,11 @@ func (mcr *Reader) startReading() error {
 	bytesreader := bufio.NewReader(mcr.reader)
 NextChunk:
 	for {
-		toBeParsed := make([]linein, 0, mcr.ChunkSize)
+		toBeParsed := make([]csvLine, 0, mcr.ChunkSize)
 		for {
 			line, err := bytesreader.ReadBytes('\n')
 			if len(line) > 0 {
-				toBeParsed = append(toBeParsed, linein{
+				toBeParsed = append(toBeParsed, csvLine{
 					data: line,
 					num:  linenum,
 				})
@@ -194,7 +194,7 @@ func (mcr *Reader) parseCSVLines() error {
 	r.TrailingComma = mcr.TrailingComma
 	r.TrimLeadingSpace = mcr.TrimLeadingSpace
 	for toBeParsed := range mcr.linein {
-		parsed := make([]lineout, 0, len(toBeParsed))
+		parsed := make([]sliceLine, 0, len(toBeParsed))
 		for _, b := range toBeParsed {
 			buf.Reset()
 			buf.Write(b.data)
@@ -204,7 +204,7 @@ func (mcr *Reader) parseCSVLines() error {
 				return err
 			}
 			if char == '\n' || char == mcr.Comment {
-				parsed = append(parsed, lineout{
+				parsed = append(parsed, sliceLine{
 					data: nil,
 					num:  b.num,
 				})
@@ -220,7 +220,7 @@ func (mcr *Reader) parseCSVLines() error {
 				mcr.Close()
 				return err
 			}
-			parsed = append(parsed, lineout{
+			parsed = append(parsed, sliceLine{
 				data: line,
 				num:  b.num,
 			})
