@@ -6,7 +6,9 @@ package multicorecsv
 
 import (
 	"bytes"
+	"encoding/csv"
 	"errors"
+	"math/rand"
 	"testing"
 )
 
@@ -88,3 +90,88 @@ func TestError(t *testing.T) {
 		t.Errorf("Wanted %s, got %s", want, got)
 	}
 }
+
+func benchmarkWrite(b *testing.B, chunkSize int) {
+	ir := &infiniteWriter{}
+	writer := NewWriter(ir)
+	writer.Comma = '\t'
+	writer.ChunkSize = chunkSize
+	b.ResetTimer()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for _, line := range sliceData {
+			err := writer.Write(line)
+			if err != nil {
+				b.Fatalf("could not write data: %s", err)
+			}
+		}
+		writer.Flush()
+	}
+	b.StopTimer()
+	writer.Close()
+}
+
+func BenchmarkWrite1(b *testing.B) {
+	benchmarkWrite(b, 1)
+}
+
+func BenchmarkWrite10(b *testing.B) {
+	benchmarkWrite(b, 10)
+}
+
+func BenchmarkWrite50(b *testing.B) {
+	benchmarkWrite(b, 50)
+}
+
+func BenchmarkWrite100(b *testing.B) {
+	benchmarkWrite(b, 100)
+}
+
+func BenchmarkWrite1000(b *testing.B) {
+	benchmarkWrite(b, 1000)
+}
+
+type infiniteWriter struct {
+	buf bytes.Buffer
+}
+
+func (iw *infiniteWriter) Write(b []byte) (int, error) {
+	i, err := iw.buf.Write(b)
+	iw.buf.Reset()
+	return i, err
+}
+
+func BenchmarkEncodingCSVWrite(b *testing.B) {
+	ir := &infiniteWriter{}
+	writer := csv.NewWriter(ir)
+	writer.Comma = '\t'
+	b.ResetTimer()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for _, line := range sliceData {
+			err := writer.Write(line)
+			if err != nil {
+				b.Fatalf("could not write data: %s", err)
+			}
+		}
+	}
+	b.StopTimer()
+}
+
+func init() {
+	for x := 0; x < 1000; x++ { // 1000 rows
+		line := make([]string, 0, 40)
+		for y := 0; y < 40; y++ { // 40 columns
+			// no newline! \n
+			length := rand.Intn(50) // 50 chars max
+			field := ""
+			for z := 0; z < length; z++ {
+				field += string(rand.Intn(112) + 35)
+			}
+			line = append(line, field)
+		}
+		sliceData = append(sliceData, line)
+	}
+}
+
+var sliceData = [][]string{}

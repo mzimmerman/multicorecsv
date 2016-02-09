@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"io"
-	"log"
+	"runtime"
 	"sync"
 )
 
@@ -77,8 +77,8 @@ func (w *Writer) Close() error {
 		close(w.linein)
 		go func() {
 			for {
-				if lineout, ok := <-w.lineout; !ok {
-					log.Printf("Throwing away lineout - %q", lineout)
+				if _, ok := <-w.lineout; !ok {
+					//					log.Printf("Throwing away lineout - %q", lineout)
 					// read them all so that the encoders can die
 					return
 				}
@@ -103,16 +103,14 @@ func (w *Writer) write(record []string) (err error) {
 	w.writeOnce.Do(func() {
 		go func() {
 			var wg sync.WaitGroup
-			//			max := runtime.NumCPU()
-			max := 2
-			wg.Add(max)
-			for x := 0; x < max; x++ {
+			wg.Add(runtime.NumCPU())
+			for x := 0; x < runtime.NumCPU(); x++ {
 				go w.startEncoding(&wg)
 			}
 			go w.startWriting()
 			go func() {
 				w.finalError = <-w.errChan
-				log.Printf("Received error - %v", w.finalError)
+				//				log.Printf("Received error - %v", w.finalError)
 				w.Close()
 			}()
 			wg.Wait()
@@ -120,7 +118,7 @@ func (w *Writer) write(record []string) (err error) {
 		}()
 	})
 	if len(w.queueIn) == w.ChunkSize || len(record) == 0 { // 0 len == Flush
-		log.Printf("Sending records for encoding, batch #%d, %q", w.place, w.queueIn)
+		//		log.Printf("Sending records for encoding, batch #%d, %q", w.place, w.queueIn)
 		w.linein <- linesToWrite{
 			data: w.queueIn,
 			num:  w.place,
@@ -129,14 +127,14 @@ func (w *Writer) write(record []string) (err error) {
 		w.queueIn = make([][]string, 0, w.ChunkSize)
 	}
 	if len(record) == 0 {
-		log.Printf("in write(), requesting flush - #%d", w.place)
+		//		log.Printf("in write(), requesting flush - #%d", w.place)
 		w.linein <- linesToWrite{
 			num: w.place,
 		}
 		w.place++
 	} else {
 		w.queueIn = append(w.queueIn, record)
-		log.Printf("in write() queueing record to write - %q", w.queueIn)
+		//		log.Printf("in write() queueing record to write - %q", w.queueIn)
 	}
 	return nil
 }
@@ -149,10 +147,10 @@ func (w *Writer) startEncoding(wg *sync.WaitGroup) {
 				num:  records.num,
 				data: nil, // sending a flush request
 			}
-			log.Printf("startEncoding() - Sent flush request - #%d", records.num)
+			//			log.Printf("startEncoding() - Sent flush request - #%d", records.num)
 			continue
 		}
-		log.Printf("startEncoding() - got batch #%d for encoding - %q", records.num, records.data)
+		//		log.Printf("startEncoding() - got batch #%d for encoding - %q", records.num, records.data)
 		buf := w.bufPool.Get().(*bytes.Buffer)
 		buf.Reset()
 		writer := csv.NewWriter(buf)
@@ -163,27 +161,27 @@ func (w *Writer) startEncoding(wg *sync.WaitGroup) {
 			num:  records.num,
 			data: buf,
 		}
-		log.Printf("Sent %d for writing - %q", records.num, buf.String())
+		//		log.Printf("Sent %d for writing - %q", records.num, buf.String())
 	}
 }
 
 func (mcw *Writer) writeInternal(buf *bytes.Buffer, bufferedWriter *bufio.Writer) {
 	if buf == nil {
-		log.Printf("Flushing underlying io.Writer")
+		//		log.Printf("Flushing underlying io.Writer")
 		err := bufferedWriter.Flush()
 		if err != nil {
-			log.Printf("writeInternal() caught error 1 - %v - sending", err)
+			//			log.Printf("writeInternal() caught error 1 - %v - sending", err)
 			mcw.errChan <- err
 		}
-		log.Printf("Flushed underlying io.Writer, sending notification")
+		//		log.Printf("Flushed underlying io.Writer, sending notification")
 		mcw.flushOperation <- struct{}{}
-		log.Printf("Sent flush notification")
+		//		log.Printf("Sent flush notification")
 		return
 	}
-	log.Printf("Writing underlying data - %q", buf.Bytes())
+	//	log.Printf("Writing underlying data - %q", buf.Bytes())
 	_, err := bufferedWriter.Write(buf.Bytes())
 	if err != nil {
-		log.Printf("writeInternal() caught error 2 - %v - sending", err)
+		//		log.Printf("writeInternal() caught error 2 - %v - sending", err)
 		mcw.errChan <- err
 	}
 	mcw.bufPool.Put(buf)
@@ -203,9 +201,9 @@ Top:
 		mcw.writeInternal(buf, bufferedWriter)
 		currentPlace++
 	}
-	log.Printf("looking for lineout #%d", currentPlace)
+	//	log.Printf("looking for lineout #%d", currentPlace)
 	for lines := range mcw.lineout {
-		log.Printf("Got line #%d from lineout", lines.num)
+		//		log.Printf("Got line #%d from lineout", lines.num)
 		if lines.num == currentPlace {
 			mcw.writeInternal(lines.data, bufferedWriter)
 			currentPlace++
