@@ -5,6 +5,7 @@
 package multicorecsv
 
 import (
+	"bytes"
 	"encoding/csv"
 	"io"
 	"math/rand"
@@ -324,6 +325,41 @@ func TestClose(t *testing.T) {
 		_, err = reader.Read()
 		if err == io.EOF {
 			return
+		}
+	}
+}
+
+func TestReadWrite(t *testing.T) {
+	sourceLine := []string{"a", "b", "c"}
+	lengths := []int{1, 5, 20, 50, 450, 700, 1030}
+	var source [][]string
+	var buf bytes.Buffer
+	for _, x := range lengths {
+		source = source[:0]
+		for y := 0; y < x; y++ {
+			source = append(source, sourceLine)
+		}
+		buf.Reset()
+		w := NewWriter(&buf)
+		err := w.WriteAll(source)
+		if err != nil {
+			t.Errorf("Error writing data to buffer - %v", err)
+		}
+		err = w.Close()
+		if err != nil {
+			t.Errorf("Error closing writer - %v", err)
+		}
+		r := NewReader(&buf)
+		res, err := r.ReadAll()
+		if err != nil {
+			t.Errorf("Error reading data from buffer - %v", err)
+		}
+		err = r.Close()
+		if err != nil {
+			t.Errorf("Error closing reader - %v", err)
+		}
+		if !reflect.DeepEqual(source, res) {
+			t.Errorf("Expected %d lines, got %d", len(source), len(res))
 		}
 	}
 }

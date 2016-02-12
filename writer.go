@@ -44,18 +44,18 @@ type Writer struct {
 	queueIn    [][]string // used to buffer lines requested to write
 	finalError error
 	//	cancel         chan struct{} // when this is closed, cancel all operations
-	writeOnce      sync.Once
 	closeOnce      sync.Once
 	errChan        chan error
 	flushOperation chan struct{} // value is sent when Flush operation completes
 	bufPool        sync.Pool
+	lock           sync.Mutex
 }
 
 // NewWriter returns a new Writer that writes to w.
-func NewWriter(w io.Writer) *Writer {
-	return &Writer{
+func NewWriter(iow io.Writer) *Writer {
+	w := &Writer{
 		Comma:   ',',
-		w:       w,
+		w:       iow,
 		lineout: make(chan csvEncoded),
 		linein:  make(chan linesToWrite),
 		queueIn: make([][]string, 0, 50),
@@ -69,6 +69,22 @@ func NewWriter(w io.Writer) *Writer {
 		flushOperation: make(chan struct{}),
 		errChan:        make(chan error),
 	}
+	go func() {
+		var wg sync.WaitGroup
+		wg.Add(runtime.NumCPU())
+		for x := 0; x < runtime.NumCPU(); x++ {
+			go w.startEncoding(&wg)
+		}
+		go w.startWriting()
+		go func() {
+			w.finalError = <-w.errChan
+			//				log.Printf("Received error - %v", w.finalError)
+			w.Close()
+		}()
+		wg.Wait()
+		close(w.lineout)
+	}()
+	return w
 }
 
 func (w *Writer) Close() error {
@@ -100,23 +116,7 @@ func (w *Writer) Write(record []string) (err error) {
 	return w.write(record)
 }
 func (w *Writer) write(record []string) (err error) {
-	w.writeOnce.Do(func() {
-		go func() {
-			var wg sync.WaitGroup
-			wg.Add(runtime.NumCPU())
-			for x := 0; x < runtime.NumCPU(); x++ {
-				go w.startEncoding(&wg)
-			}
-			go w.startWriting()
-			go func() {
-				w.finalError = <-w.errChan
-				//				log.Printf("Received error - %v", w.finalError)
-				w.Close()
-			}()
-			wg.Wait()
-			close(w.lineout)
-		}()
-	})
+	w.lock.Lock()
 	if len(w.queueIn) == w.ChunkSize || len(record) == 0 { // 0 len == Flush
 		//		log.Printf("Sending records for encoding, batch #%d, %q", w.place, w.queueIn)
 		w.linein <- linesToWrite{
@@ -136,6 +136,7 @@ func (w *Writer) write(record []string) (err error) {
 		w.queueIn = append(w.queueIn, record)
 		//		log.Printf("in write() queueing record to write - %q", w.queueIn)
 	}
+	w.lock.Unlock()
 	return nil
 }
 
