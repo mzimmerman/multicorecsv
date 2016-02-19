@@ -51,7 +51,7 @@ type Writer struct {
 	lock           sync.Mutex
 }
 
-// NewWriter returns a new Writer that writes to w.
+// NewWriter returns a new Writer that writes to w.  Must call Close when done.
 func NewWriter(iow io.Writer) *Writer {
 	w := &Writer{
 		Comma:   ',',
@@ -79,7 +79,7 @@ func NewWriter(iow io.Writer) *Writer {
 		go func() {
 			w.finalError = <-w.errChan
 			//				log.Printf("Received error - %v", w.finalError)
-			w.Close()
+			_ = w.Close()
 		}()
 		wg.Wait()
 		close(w.lineout)
@@ -87,64 +87,66 @@ func NewWriter(iow io.Writer) *Writer {
 	return w
 }
 
-func (w *Writer) Close() error {
-	w.closeOnce.Do(func() {
-		w.Flush()
-		close(w.linein)
+// Close closes the underlying io.Writer if it's also an io.Closer as well as
+// cleaning up all goroutines
+func (mcw *Writer) Close() error {
+	mcw.closeOnce.Do(func() {
+		mcw.Flush()
+		close(mcw.linein)
 		go func() {
 			for {
-				if _, ok := <-w.lineout; !ok {
+				if _, ok := <-mcw.lineout; !ok {
 					//					log.Printf("Throwing away lineout - %q", lineout)
 					// read them all so that the encoders can die
 					return
 				}
 			}
 		}()
-		if closer, ok := w.w.(io.Closer); ok {
-			w.finalError = closer.Close()
+		if closer, ok := mcw.w.(io.Closer); ok {
+			mcw.finalError = closer.Close()
 		}
 	})
-	return w.finalError
+	return mcw.finalError
 }
 
 // Writer writes a single CSV record to w along with any necessary quoting.
 // A record is a slice of strings with each string being one field.
-func (w *Writer) Write(record []string) (err error) {
+func (mcw *Writer) Write(record []string) (err error) {
 	if len(record) == 0 {
 		return nil // done!
 	}
-	return w.write(record)
+	return mcw.write(record)
 }
-func (w *Writer) write(record []string) (err error) {
-	w.lock.Lock()
-	if len(w.queueIn) == w.ChunkSize || len(record) == 0 { // 0 len == Flush
+func (mcw *Writer) write(record []string) (err error) {
+	mcw.lock.Lock()
+	if len(mcw.queueIn) == mcw.ChunkSize || len(record) == 0 { // 0 len == Flush
 		//		log.Printf("Sending records for encoding, batch #%d, %q", w.place, w.queueIn)
-		w.linein <- linesToWrite{
-			data: w.queueIn,
-			num:  w.place,
+		mcw.linein <- linesToWrite{
+			data: mcw.queueIn,
+			num:  mcw.place,
 		}
-		w.place++
-		w.queueIn = make([][]string, 0, w.ChunkSize)
+		mcw.place++
+		mcw.queueIn = make([][]string, 0, mcw.ChunkSize)
 	}
 	if len(record) == 0 {
 		//		log.Printf("in write(), requesting flush - #%d", w.place)
-		w.linein <- linesToWrite{
-			num: w.place,
+		mcw.linein <- linesToWrite{
+			num: mcw.place,
 		}
-		w.place++
+		mcw.place++
 	} else {
-		w.queueIn = append(w.queueIn, record)
+		mcw.queueIn = append(mcw.queueIn, record)
 		//		log.Printf("in write() queueing record to write - %q", w.queueIn)
 	}
-	w.lock.Unlock()
+	mcw.lock.Unlock()
 	return nil
 }
 
-func (w *Writer) startEncoding(wg *sync.WaitGroup) {
+func (mcw *Writer) startEncoding(wg *sync.WaitGroup) {
 	defer wg.Done()
-	for records := range w.linein {
+	for records := range mcw.linein {
 		if len(records.data) == 0 {
-			w.lineout <- csvEncoded{
+			mcw.lineout <- csvEncoded{
 				num:  records.num,
 				data: nil, // sending a flush request
 			}
@@ -152,13 +154,13 @@ func (w *Writer) startEncoding(wg *sync.WaitGroup) {
 			continue
 		}
 		//		log.Printf("startEncoding() - got batch #%d for encoding - %q", records.num, records.data)
-		buf := w.bufPool.Get().(*bytes.Buffer)
+		buf := mcw.bufPool.Get().(*bytes.Buffer)
 		buf.Reset()
 		writer := csv.NewWriter(buf)
-		writer.Comma = w.Comma
-		writer.UseCRLF = w.UseCRLF
-		writer.WriteAll(records.data) // can ignore error, writing to a buffer
-		w.lineout <- csvEncoded{
+		writer.Comma = mcw.Comma
+		writer.UseCRLF = mcw.UseCRLF
+		_ = writer.WriteAll(records.data) // can ignore error, writing to a buffer
+		mcw.lineout <- csvEncoded{
 			num:  records.num,
 			data: buf,
 		}
@@ -218,25 +220,26 @@ Top:
 
 // Flush writes any buffered data to the underlying io.Writer.
 // To check if an error occurred during the Flush, call Error.
-func (w *Writer) Flush() {
-	w.write(nil)
-	<-w.flushOperation
+func (mcw *Writer) Flush() {
+	_ = mcw.write(nil)
+	<-mcw.flushOperation
 }
 
 // Error reports any error that has occurred during a previous Write or Flush.
-func (w *Writer) Error() error {
-	_, err := w.w.Write(nil)
+func (mcw *Writer) Error() error {
+	_, err := mcw.w.Write(nil)
 	return err
 }
 
 // WriteAll writes multiple CSV records to w using Write and then calls Flush.
-func (w *Writer) WriteAll(records [][]string) (err error) {
+// Close must still be called after WriteAll to clean up the underlying goroutines
+func (mcw *Writer) WriteAll(records [][]string) (err error) {
 	for _, record := range records {
-		err = w.Write(record)
+		err = mcw.Write(record)
 		if err != nil {
 			return err
 		}
 	}
-	w.Flush()
-	return w.Error()
+	mcw.Flush()
+	return mcw.Error()
 }

@@ -197,10 +197,10 @@ func (mcr *Reader) parseCSVLines() error {
 		parsed := make([]sliceLine, 0, len(toBeParsed))
 		for _, b := range toBeParsed {
 			buf.Reset()
-			buf.Write(b.data)
+			_, _ = buf.Write(b.data)
 			char, _, err := buf.ReadRune()
 			if err != nil {
-				mcr.Close()
+				_ = mcr.Close()
 				return err
 			}
 			if char == '\n' || char == mcr.Comment {
@@ -210,14 +210,14 @@ func (mcr *Reader) parseCSVLines() error {
 				})
 				continue
 			}
-			buf.UnreadRune()
+			_ = buf.UnreadRune()
 			line, err := r.Read()
 			if err != nil {
 				pe, ok := err.(*csv.ParseError)
 				if ok {
 					pe.Line = b.num + 1
 				}
-				mcr.Close()
+				_ = mcr.Close()
 				return err
 			}
 			parsed = append(parsed, sliceLine{
