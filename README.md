@@ -6,7 +6,7 @@ A multicore csv library in Go which is ~3x faster than plain encoding/csv
 ## No newline support on multicorecsv.Reader!
 - muticorecsv does not support reading CSV files with properly quoted/escaped newlines!  If you have \n in your source data fields, multicorecsv Read() will not work for you.
 
-## API Changes from encoing/csv
+## API Changes from encoding/csv
 - multicorecsv is an *almost* drop in replacement for encoding/csv.  There's only one new requirement, you must use the Close() method.  Best practice is a defer (reader/writer).Close()
 ```
 func main() {
@@ -72,11 +72,11 @@ BenchmarkRead1000-2               100000             18581 ns/op
 BenchmarkRead1000-4               100000             11184 ns/op
 BenchmarkRead1000-8               200000             11484 ns/op
 BenchmarkRead1000-16              100000             10061 ns/op
-BenchmarkEncodingCSV               50000             27706 ns/op
-BenchmarkEncodingCSV-2             50000             27765 ns/op
-BenchmarkEncodingCSV-4             50000             28126 ns/op
-BenchmarkEncodingCSV-8             50000             28090 ns/op
-BenchmarkEncodingCSV-16            50000             28457 ns/op
+BenchmarkEncodingCSVRead               50000             27706 ns/op
+BenchmarkEncodingCSVRead-2             50000             27765 ns/op
+BenchmarkEncodingCSVRead-4             50000             28126 ns/op
+BenchmarkEncodingCSVRead-8             50000             28090 ns/op
+BenchmarkEncodingCSVRead-16            50000             28457 ns/op
 BenchmarkWrite1                       50          25826817 ns/op
 BenchmarkWrite1-2                    100          19699325 ns/op
 BenchmarkWrite1-4                    100          15331869 ns/op

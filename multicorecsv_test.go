@@ -417,7 +417,7 @@ func (ir *infiniteReader) Read(buf []byte) (int, error) {
 	return l, nil
 }
 
-func BenchmarkEncodingCSV(b *testing.B) {
+func BenchmarkEncodingCSVRead(b *testing.B) {
 	ir := &infiniteReader{
 		data: data,
 	}
