@@ -91,6 +91,11 @@ var readTests = []struct {
 		},
 	},
 	{
+		Name:   "CRLFBlankLine",
+		Input:  "a,b\r\n\r\nc,d\r\n",
+		Output: [][]string{{"a", "b"}, {"c", "d"}},
+	},
+	{
 		Name:               "BlankLineFieldCount",
 		Input:              "a,b,c\n\nd,e,f\n\n",
 		UseFieldsPerRecord: true,
