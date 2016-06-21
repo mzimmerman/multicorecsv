@@ -160,6 +160,9 @@ NextChunk:
 		for {
 			line, err := bytesreader.ReadBytes('\n')
 			if len(line) > 0 {
+				if line[0] == '\r' {
+					continue // we don't care about 'blank' lines from Windows style
+				}
 				toBeParsed = append(toBeParsed, csvLine{
 					data: line,
 					num:  linenum,
