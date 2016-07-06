@@ -93,7 +93,7 @@ func TestError(t *testing.T) {
 
 func benchmarkWrite(b *testing.B, chunkSize int) {
 	ir := &infiniteWriter{}
-	writer := NewWriter(ir)
+	writer := NewWriterSized(ir, chunkSize)
 	writer.Comma = '\t'
 	writer.ChunkSize = chunkSize
 	b.ResetTimer()

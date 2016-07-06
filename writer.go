@@ -53,14 +53,19 @@ type Writer struct {
 
 // NewWriter returns a new Writer that writes to w.  Must call Close when done.
 func NewWriter(iow io.Writer) *Writer {
+	return NewWriterSized(iow, 50) // sane default
+}
+
+// NewWriter returns a new Writer that writes to w with a specific chunkSize.  Must call Close when done.
+func NewWriterSized(iow io.Writer, chunkSize int) *Writer {
 	w := &Writer{
 		Comma:   ',',
 		w:       iow,
-		lineout: make(chan csvEncoded),
-		linein:  make(chan linesToWrite),
-		queueIn: make([][]string, 0, 50),
+		lineout: make(chan csvEncoded, chunkSize),
+		linein:  make(chan linesToWrite, chunkSize),
+		queueIn: make([][]string, 0, chunkSize),
 		//		cancel:    make(chan struct{}),
-		ChunkSize: 50, // sane default
+		ChunkSize: chunkSize, // sane default
 		bufPool: sync.Pool{
 			New: func() interface{} {
 				return &bytes.Buffer{}

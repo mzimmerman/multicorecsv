@@ -373,9 +373,8 @@ func benchmarkRead(b *testing.B, chunkSize int) {
 	ir := &infiniteReader{
 		data: data,
 	}
-	reader := NewReader(ir)
+	reader := NewReaderSized(ir, chunkSize)
 	reader.Comma = '\t'
-	reader.ChunkSize = chunkSize
 	b.ResetTimer()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {

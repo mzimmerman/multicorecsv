@@ -43,15 +43,20 @@ type Reader struct {
 
 // NewReader returns a new Reader that reads from r.
 func NewReader(r io.Reader) *Reader {
+	return NewReaderSized(r, 50)
+}
+
+// NewReader returns a new Reader that reads from r with the chunked size
+func NewReaderSized(r io.Reader, chunkSize int) *Reader {
 	return &Reader{
 		reader:    r,
 		Comma:     ',',
-		linein:    make(chan []csvLine),
-		lineout:   make(chan []sliceLine),
+		linein:    make(chan []csvLine, chunkSize),
+		lineout:   make(chan []sliceLine, chunkSize),
 		errChan:   make(chan error),
 		queue:     make(map[int][]string),
 		cancel:    make(chan struct{}),
-		ChunkSize: 50,
+		ChunkSize: chunkSize,
 	}
 }
 
