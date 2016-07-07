@@ -127,10 +127,6 @@ func BenchmarkWrite100(b *testing.B) {
 	benchmarkWrite(b, 100)
 }
 
-func BenchmarkWrite1000(b *testing.B) {
-	benchmarkWrite(b, 1000)
-}
-
 type infiniteWriter struct {
 	buf bytes.Buffer
 }

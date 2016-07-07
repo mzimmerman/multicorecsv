@@ -403,10 +403,6 @@ func BenchmarkRead100(b *testing.B) {
 	benchmarkRead(b, 100)
 }
 
-func BenchmarkRead1000(b *testing.B) {
-	benchmarkRead(b, 1000)
-}
-
 type infiniteReader struct {
 	loc  int
 	data []byte
