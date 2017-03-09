@@ -281,6 +281,12 @@ a,bb,c
 a,bb,c
 `,
 	},
+	{
+		Name:             "DataWithMetaLine",
+		TrimLeadingSpace: true,
+		Input:            "sep=,\na,b,c, ",
+		Output:           [][]string{{"a", "b", "c", ""}},
+	},
 }
 
 func TestRead(t *testing.T) {
