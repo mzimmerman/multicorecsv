@@ -43,6 +43,10 @@ type Reader struct {
 	MetaLine         []byte // meta line of separator declaration used by MS Excel
 }
 
+// ErrSeparatorMismatch is error when separator declaration in meta line
+// is not consistent with given separator.
+var ErrSeparatorMismatch = errors.New("multicorecsv: separator declaration in meta line is not consistent with given separator")
+
 // NewReader returns a new Reader that reads from r.
 func NewReader(r io.Reader) *Reader {
 	return NewReaderSized(r, 50)
@@ -161,6 +165,7 @@ func (mcr *Reader) startReading() error {
 	defer close(mcr.linein)
 	linenum := 0
 	bytesreader := bufio.NewReader(mcr.reader)
+	checkMetaLine := true
 NextChunk:
 	for {
 		toBeParsed := make([]csvLine, 0, mcr.ChunkSize)
@@ -170,6 +175,18 @@ NextChunk:
 				if line[0] == '\r' {
 					continue // we don't care about 'blank' lines from Windows style
 				}
+
+				if checkMetaLine {
+					if len(line) >= 5 && bytes.Equal(line[0:4], []byte("sep=")) {
+						if mcr.Comma != rune(line[4]) {
+							return ErrSeparatorMismatch
+						}
+						mcr.MetaLine = line[0 : len(line)-1]
+						continue
+					}
+					checkMetaLine = false
+				}
+
 				toBeParsed = append(toBeParsed, csvLine{
 					data: line,
 					num:  linenum,
@@ -195,10 +212,6 @@ NextChunk:
 	}
 }
 
-// ErrSeparatorMismatch is error when separator declaration in meta line
-// is not consistent with given separator.
-var ErrSeparatorMismatch = errors.New("multicorecsv: separator declaration in meta line is not consistent with given separator")
-
 func (mcr *Reader) parseCSVLines() error {
 	var buf bytes.Buffer
 	r := csv.NewReader(&buf)
@@ -207,21 +220,7 @@ func (mcr *Reader) parseCSVLines() error {
 	r.LazyQuotes = mcr.LazyQuotes
 	r.TrailingComma = mcr.TrailingComma
 	r.TrimLeadingSpace = mcr.TrimLeadingSpace
-	checkMetaLine := true
-	hasMetaLine := false
 	for toBeParsed := range mcr.linein {
-		if checkMetaLine {
-			if len(toBeParsed) > 0 && len(toBeParsed[0].data) >= 5 && bytes.Equal(toBeParsed[0].data[0:4], []byte("sep=")) {
-				if r.Comma != rune(toBeParsed[0].data[4]) {
-					return ErrSeparatorMismatch
-				}
-				mcr.MetaLine = toBeParsed[0].data[0 : len(toBeParsed[0].data)-1]
-				toBeParsed = toBeParsed[1:]
-				hasMetaLine = true
-			}
-			checkMetaLine = false
-		}
-
 		parsed := make([]sliceLine, 0, len(toBeParsed))
 		for _, b := range toBeParsed {
 			buf.Reset()
@@ -232,17 +231,10 @@ func (mcr *Reader) parseCSVLines() error {
 				return err
 			}
 			if char == '\n' || char == mcr.Comment {
-				if hasMetaLine {
-					parsed = append(parsed, sliceLine{
-						data: nil,
-						num:  b.num - 1,
-					})
-				} else {
-					parsed = append(parsed, sliceLine{
-						data: nil,
-						num:  b.num,
-					})
-				}
+				parsed = append(parsed, sliceLine{
+					data: nil,
+					num:  b.num,
+				})
 				continue
 			}
 			_ = buf.UnreadRune()
@@ -250,27 +242,16 @@ func (mcr *Reader) parseCSVLines() error {
 			if err != nil {
 				pe, ok := err.(*csv.ParseError)
 				if ok {
-					if hasMetaLine {
-						pe.Line = b.num
-					} else {
-						pe.Line = b.num + 1
-					}
+					pe.Line = b.num + 1
 				}
 				_ = mcr.Close()
 				return err
 			}
 
-			if hasMetaLine {
-				parsed = append(parsed, sliceLine{
-					data: line,
-					num:  b.num - 1,
-				})
-			} else {
-				parsed = append(parsed, sliceLine{
-					data: line,
-					num:  b.num,
-				})
-			}
+			parsed = append(parsed, sliceLine{
+				data: line,
+				num:  b.num,
+			})
 		}
 		select {
 		case mcr.lineout <- parsed:
