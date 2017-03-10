@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"io"
 	"runtime"
 	"sync"
@@ -38,15 +39,20 @@ type Reader struct {
 	cancel           chan struct{} // when this is closed, cancel all operations
 	readOnce         sync.Once
 	closeOnce        sync.Once
-	ChunkSize        int // the # of lines to hand to each goroutine -- default 50
+	ChunkSize        int    // the # of lines to hand to each goroutine -- default 50
+	MetaLine         []byte // meta line of separator declaration used by MS Excel
 }
+
+// ErrSeparatorMismatch is error when separator declaration in meta line
+// is not consistent with given separator.
+var ErrSeparatorMismatch = errors.New("multicorecsv: separator declaration in meta line is not consistent with given separator")
 
 // NewReader returns a new Reader that reads from r.
 func NewReader(r io.Reader) *Reader {
 	return NewReaderSized(r, 50)
 }
 
-// NewReader returns a new Reader that reads from r with the chunked size
+// NewReaderSized returns a new Reader that reads from r with the chunked size
 func NewReaderSized(r io.Reader, chunkSize int) *Reader {
 	return &Reader{
 		reader:    r,
@@ -159,6 +165,7 @@ func (mcr *Reader) startReading() error {
 	defer close(mcr.linein)
 	linenum := 0
 	bytesreader := bufio.NewReader(mcr.reader)
+	checkMetaLine := true
 NextChunk:
 	for {
 		toBeParsed := make([]csvLine, 0, mcr.ChunkSize)
@@ -168,6 +175,18 @@ NextChunk:
 				if line[0] == '\r' {
 					continue // we don't care about 'blank' lines from Windows style
 				}
+
+				if checkMetaLine {
+					if len(line) >= 5 && bytes.Equal(line[0:4], []byte("sep=")) {
+						if mcr.Comma != rune(line[4]) {
+							return ErrSeparatorMismatch
+						}
+						mcr.MetaLine = line[0 : len(line)-1]
+						continue
+					}
+					checkMetaLine = false
+				}
+
 				toBeParsed = append(toBeParsed, csvLine{
 					data: line,
 					num:  linenum,
@@ -228,6 +247,7 @@ func (mcr *Reader) parseCSVLines() error {
 				_ = mcr.Close()
 				return err
 			}
+
 			parsed = append(parsed, sliceLine{
 				data: line,
 				num:  b.num,
