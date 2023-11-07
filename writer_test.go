@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 )
@@ -162,7 +163,7 @@ func init() {
 			length := rand.Intn(50) // 50 chars max
 			field := ""
 			for z := 0; z < length; z++ {
-				field += string(rand.Intn(112) + 35)
+				field += fmt.Sprint(rand.Intn(112) + 35)
 			}
 			line = append(line, field)
 		}

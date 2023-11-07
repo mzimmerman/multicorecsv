@@ -285,7 +285,7 @@ a,bb,c
 
 func TestRead(t *testing.T) {
 	for _, tt := range readTests {
-		r := NewReader(strings.NewReader(tt.Input))
+		r := OldNewReader(strings.NewReader(tt.Input))
 		r.Comment = tt.Comment
 		if tt.UseFieldsPerRecord {
 			r.FieldsPerRecord = tt.FieldsPerRecord
@@ -319,7 +319,7 @@ func TestClose(t *testing.T) {
 	ir := &infiniteReader{
 		data: data,
 	}
-	reader := NewReader(ir)
+	reader := OldNewReader(ir)
 	reader.Comma = '\t'
 	_, err := reader.Read() // start the process
 	if err != nil {
@@ -354,7 +354,7 @@ func TestReadWrite(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error closing writer - %v", err)
 		}
-		r := NewReader(&buf)
+		r := OldNewReader(&buf)
 		res, err := r.ReadAll()
 		if err != nil {
 			t.Errorf("Error reading data from buffer - %v", err)
@@ -373,7 +373,7 @@ func benchmarkRead(b *testing.B, chunkSize int) {
 	ir := &infiniteReader{
 		data: data,
 	}
-	reader := NewReaderSized(ir, chunkSize)
+	reader := OldNewReaderSized(ir, chunkSize)
 	reader.Comma = '\t'
 	b.ResetTimer()
 	b.StartTimer()

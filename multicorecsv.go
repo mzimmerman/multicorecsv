@@ -19,8 +19,8 @@ type sliceLine struct {
 	num  int
 }
 
-// Reader contains all the internals required.  Use NewReader(io.Reader).
-type Reader struct {
+// OldReader contains all the internals required.  Use NewReader(io.OldReader).
+type OldReader struct {
 	reader  io.Reader
 	linein  chan []csvLine
 	lineout chan []sliceLine
@@ -41,14 +41,14 @@ type Reader struct {
 	ChunkSize        int // the # of lines to hand to each goroutine -- default 50
 }
 
-// NewReader returns a new Reader that reads from r.
-func NewReader(r io.Reader) *Reader {
-	return NewReaderSized(r, 50)
+// OldNewReader returns a new Reader that reads from r.
+func OldNewReader(r io.Reader) *OldReader {
+	return OldNewReaderSized(r, 50)
 }
 
 // NewReader returns a new Reader that reads from r with the chunked size
-func NewReaderSized(r io.Reader, chunkSize int) *Reader {
-	return &Reader{
+func OldNewReaderSized(r io.Reader, chunkSize int) *OldReader {
+	return &OldReader{
 		reader:    r,
 		Comma:     ',',
 		linein:    make(chan []csvLine, chunkSize),
@@ -62,7 +62,7 @@ func NewReaderSized(r io.Reader, chunkSize int) *Reader {
 
 // Close will clean up any goroutines that aren't finished.
 // It will also close the underlying Reader if it implements io.ReadCloser
-func (mcr *Reader) Close() error {
+func (mcr *OldReader) Close() error {
 	var insideError error
 	mcr.closeOnce.Do(func() {
 		close(mcr.cancel)
@@ -78,7 +78,7 @@ func (mcr *Reader) Close() error {
 // A successful call returns err == nil, not err == EOF. Because ReadAll is
 // defined to read until EOF, it does not treat end of file as an error to be
 // reported.
-func (mcr *Reader) ReadAll() ([][]string, error) {
+func (mcr *OldReader) ReadAll() ([][]string, error) {
 	var all [][]string
 	out, errChan := mcr.Stream()
 	for line := range out {
@@ -91,7 +91,7 @@ func (mcr *Reader) ReadAll() ([][]string, error) {
 // Lines are sent on the channel in order they were in the source file.
 // The caller must receive all rows and receive the error from the error chan,
 // otherwise the caller must call Close to clean up any goroutines.
-func (mcr *Reader) Stream() (chan []string, chan error) {
+func (mcr *OldReader) Stream() (chan []string, chan error) {
 	out := make(chan []string)
 	errChan := make(chan error, 1)
 	go func() {
@@ -118,7 +118,7 @@ func (mcr *Reader) Stream() (chan []string, chan error) {
 // Read reads one record from r.  The record is a slice of strings with each
 // string representing one field.  In the background, the internal io.Reader
 // will be read from ahead of the caller utilizing Read() to pull every row
-func (mcr *Reader) Read() ([]string, error) {
+func (mcr *OldReader) Read() ([]string, error) {
 	if mcr.finalError != nil {
 		return nil, mcr.finalError
 	}
@@ -155,7 +155,7 @@ func (mcr *Reader) Read() ([]string, error) {
 	return nil, mcr.finalError
 }
 
-func (mcr *Reader) startReading() error {
+func (mcr *OldReader) startReading() error {
 	defer close(mcr.linein)
 	linenum := 0
 	bytesreader := bufio.NewReader(mcr.reader)
@@ -193,7 +193,7 @@ NextChunk:
 	}
 }
 
-func (mcr *Reader) parseCSVLines() error {
+func (mcr *OldReader) parseCSVLines() error {
 	var buf bytes.Buffer
 	r := csv.NewReader(&buf)
 	r.Comma = mcr.Comma
@@ -242,7 +242,7 @@ func (mcr *Reader) parseCSVLines() error {
 	return nil
 }
 
-func (mcr *Reader) waitForDone(err1, err2 chan error) {
+func (mcr *OldReader) waitForDone(err1, err2 chan error) {
 	foundError := <-err1
 	for i := 0; i < runtime.NumCPU(); i++ {
 		err := <-err2
@@ -257,7 +257,7 @@ func (mcr *Reader) waitForDone(err1, err2 chan error) {
 	mcr.errChan <- foundError
 }
 
-func (mcr *Reader) start() {
+func (mcr *OldReader) start() {
 	mcr.readOnce.Do(func() {
 		err1 := make(chan error, 1)
 		err2 := make(chan error)
