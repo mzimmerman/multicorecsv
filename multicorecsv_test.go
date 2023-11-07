@@ -147,7 +147,7 @@ var readTests = []struct {
 	{
 		Name:  "BadDoubleQuotes",
 		Input: `a""b,c`,
-		Error: `bare " in non-quoted-field`, Line: 1, Column: 1,
+		Error: `bare " in non-quoted-field`, Line: 1, Column: 2,
 	},
 	{
 		Name:             "TrimQuote",
@@ -158,17 +158,17 @@ var readTests = []struct {
 	{
 		Name:  "BadBareQuote",
 		Input: `a "word","b"`,
-		Error: `bare " in non-quoted-field`, Line: 1, Column: 2,
+		Error: `bare " in non-quoted-field`, Line: 1, Column: 3,
 	},
 	{
 		Name:  "BadTrailingQuote",
 		Input: `"a word",b"`,
-		Error: `bare " in non-quoted-field`, Line: 1, Column: 10,
+		Error: `bare " in non-quoted-field`, Line: 1, Column: 11,
 	},
 	{
 		Name:  "ExtraneousQuote",
 		Input: `"a "word","b"`,
-		Error: `extraneous " in field`, Line: 1, Column: 3,
+		Error: `extraneous or missing " in quoted-field`, Line: 1, Column: 4,
 	},
 	//	{
 	//		Name:               "BadFieldCount",
@@ -271,7 +271,7 @@ x,,,
 	// if there were more errors in the data, this could race as to which line
 	{
 		Name:  "Multicore error",
-		Error: `bare " in non-quoted-field`, Line: 4, Column: 3,
+		Error: `bare " in non-quoted-field`, Line: 4, Column: 4,
 		Input: `a,bb,c
 a,bb,c
 a,bb,c
